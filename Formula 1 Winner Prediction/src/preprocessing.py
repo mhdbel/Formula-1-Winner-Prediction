@@ -1,104 +1,106 @@
 import pandas as pd
 from pathlib import Path
+from src import config
+from src.utils import logger # Import logger
 
 def preprocess_data(data):
     """
     Preprocess raw data for modeling.
     Assumes 'data' is a pandas DataFrame.
     """
-    # Ensure data is a DataFrame
     if not isinstance(data, pd.DataFrame):
-        print("Error: Input data is not a pandas DataFrame.")
-        return pd.DataFrame() # Return empty DataFrame or raise error
+        logger.error("Input data is not a pandas DataFrame.")
+        return pd.DataFrame()
 
-    # Drop unnecessary columns
-    # Add defensive check for column existence before dropping
     cols_to_drop = ['Time', 'Driver', 'Team', 'LapTime']
     existing_cols_to_drop = [col for col in cols_to_drop if col in data.columns]
-    data = data.drop(columns=existing_cols_to_drop, errors='ignore') # errors='ignore' is good, but explicit check is better
-    
-    # Handle missing values for sector times
-    # Check if sector time columns exist before trying to fill
+    data = data.drop(columns=existing_cols_to_drop, errors='ignore')
+
     sector_time_cols = ['Sector1Time', 'Sector2Time', 'Sector3Time']
     for col in sector_time_cols:
         if col in data.columns:
-            if data[col].isnull().any(): # Only fill if there are NaNs
+            if data[col].isnull().any():
                 data[col].fillna(data[col].mean(), inplace=True)
         else:
-            print(f"Warning: Column {col} not found for missing value imputation.")
-            # Consider creating these columns with NaNs or a default if they are essential downstream
-            # For now, we'll assume they might be missing and the model can handle it or it's an issue.
+            logger.warning(f"Column {col} not found for missing value imputation.")
 
-    # Feature engineering
-    # Ensure sector time columns are present for AvgSectorTime
     if all(col in data.columns for col in sector_time_cols):
         data['AvgSectorTime'] = data[sector_time_cols].mean(axis=1)
     else:
-        print("Warning: Not all sector time columns present for AvgSectorTime calculation.")
-        data['AvgSectorTime'] = pd.NA # Or 0 or mean, depending on downstream needs
+        logger.warning("Not all sector time columns present for AvgSectorTime calculation.")
+        data['AvgSectorTime'] = pd.NA
 
-    # Ensure IsPersonalBest column exists
     if 'IsPersonalBest' in data.columns:
         data['FastestLap'] = (data['IsPersonalBest']).astype(int)
     else:
-        print("Warning: Column 'IsPersonalBest' not found for 'FastestLap' feature.")
-        data['FastestLap'] = 0 # Default value
+        logger.warning("Column 'IsPersonalBest' not found for 'FastestLap' feature.")
+        data['FastestLap'] = 0
 
-    # Encode categorical variables
-    # Ensure Compound column exists
+    # Handle 'Compound' column for one-hot encoding
     if 'Compound' in data.columns:
+        # Ensure 'Compound' is treated as categorical to handle potential mixed types if read from CSV
+        data['Compound'] = data['Compound'].astype('category')
+        # Explicitly define categories to ensure consistent dummy variable creation
+        # This helps if not all compounds are present in a given batch of data.
+        # Order matters if drop_first=True is used and categories are not sorted by get_dummies.
+        # Alphabetical sort: HARD, MEDIUM, SOFT. If HARD is dropped, Compound_MEDIUM, Compound_SOFT created.
+        # If we want to ensure a specific one is dropped (e.g. 'HARD'), we can set categories.
+        # However, pandas get_dummies sorts lexical by default for drop_first if not a factor.
+        # To be explicit about which columns are created:
+        # compounds = ['HARD', 'MEDIUM', 'SOFT'] # Example, adjust to actual data
+        # data['Compound'] = pd.Categorical(data['Compound'], categories=compounds, ordered=False)
         data = pd.get_dummies(data, columns=['Compound'], prefix='Compound', drop_first=True)
     else:
-        print("Warning: Column 'Compound' not found for one-hot encoding.")
-        # This will result in missing dummy columns that the model might expect.
-        # A robust solution would be to add known compound columns with 0 if 'Compound' is missing.
-    
+        logger.warning("Column 'Compound' not found. Creating dummy columns ('Compound_MEDIUM', 'Compound_SOFT') with all zeros.")
+        # Assuming 'HARD' is the baseline category that would be dropped by drop_first=True.
+        # If 'Compound' column was present and pd.get_dummies(..., drop_first=True) was used,
+        # and if compounds were 'HARD', 'MEDIUM', 'SOFT', pandas would sort them,
+        # drop 'Compound_HARD' (first alphabetically), and create 'Compound_MEDIUM', 'Compound_SOFT'.
+        data['Compound_MEDIUM'] = 0
+        data['Compound_SOFT'] = 0
+        # If other compounds are possible (e.g. 'WET', 'INTERMEDIATE'), they would also need to be handled.
+        # For this example, sticking to SOFT, MEDIUM, HARD.
+
     return data
 
 def save_processed_data(data, filename):
     """
-    Save preprocessed data to a CSV file.
+    Save preprocessed data to a CSV file in the processed_data directory.
     """
-    filepath = Path('data/processed_data') / filename
+    filepath = config.PROCESSED_DATA_DIR / filename
     try:
-        filepath.parent.mkdir(parents=True, exist_ok=True) # Ensure directory exists
+        filepath.parent.mkdir(parents=True, exist_ok=True)
         data.to_csv(filepath, index=False)
-        print(f"Processed data saved to {filepath}")
+        logger.info(f"Processed data saved to {filepath}")
     except Exception as e:
-        print(f"Error saving processed data to {filepath}: {e}")
+        logger.error(f"Error saving processed data to {filepath}: {e}", exc_info=True)
 
 if __name__ == '__main__':
-    # Example usage:
-    # Create a dummy raw data file for the example if it doesn't exist,
-    # or point to an existing one.
-    
-    # Define path for the raw data CSV
-    raw_data_dir = Path('data/raw_data')
-    raw_data_filename = 'canadian_gp_2023.csv' # Example filename
+    raw_data_dir = config.RAW_DATA_DIR
+    raw_data_filename = config.DEFAULT_RAW_FILENAME
     raw_data_path = raw_data_dir / raw_data_filename
+    processed_data_filename = config.DEFAULT_PROCESSED_FILENAME
 
-    processed_data_filename = 'processed_canadian_gp.csv' # Example output
-
-    print(f"Attempting to preprocess data from: {raw_data_path}")
+    logger.info(f"Attempting to preprocess data from: {raw_data_path}")
 
     if raw_data_path.exists():
         try:
             raw_data_df = pd.read_csv(raw_data_path)
             if not raw_data_df.empty:
-                print("Raw data loaded successfully. Starting preprocessing...")
-                processed_df = preprocess_data(raw_data_df.copy()) # Use .copy() as preprocess_data might modify
-                
+                logger.info("Raw data loaded successfully. Starting preprocessing...")
+                processed_df = preprocess_data(raw_data_df.copy())
+
                 if not processed_df.empty:
-                    print("Preprocessing complete. Saving processed data...")
+                    logger.info("Preprocessing complete. Saving processed data...")
                     save_processed_data(processed_df, processed_data_filename)
                 else:
-                    print("Preprocessing resulted in an empty DataFrame. Not saving.")
+                    logger.warning("Preprocessing resulted in an empty DataFrame. Not saving.")
             else:
-                print(f"Raw data file {raw_data_path} is empty.")
+                logger.warning(f"Raw data file {raw_data_path} is empty.")
         except pd.errors.EmptyDataError:
-            print(f"Error: The file {raw_data_path} is empty or not a valid CSV.")
+            logger.error(f"The file {raw_data_path} is empty or not a valid CSV.", exc_info=True)
         except Exception as e:
-            print(f"An error occurred during the preprocessing pipeline: {e}")
+            logger.error(f"An error occurred during the preprocessing pipeline: {e}", exc_info=True)
     else:
-        print(f"Error: Raw data file not found at {raw_data_path}.")
-        print("Please ensure 'data_collection.py' has run successfully or that a raw data file exists at this location.")
+        logger.error(f"Raw data file not found at {raw_data_path}.")
+        logger.info("Please ensure 'data_collection.py' has run successfully or that a raw data file exists at this location.")
