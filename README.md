@@ -38,40 +38,40 @@ The project is organized as follows:
 
 f1_winner_prediction/
 │
-├── README.md # Project overview, setup instructions, and usage
-├── requirements.txt # List of required Python libraries
-├── data/ # Folder for raw and processed data
-│ ├── raw_data/ # Raw data fetched from APIs or fastf1
-│ └── processed_data/ # Preprocessed data files (e.g., CSVs)
+├── README.md
+├── requirements.txt
+├── data/
+│ ├── raw_data/
+│ └── processed_data/
 │
-├── src/ # Source code for the project
-│ ├── init .py # Makes src a Python package
-│ ├── data_collection.py # Module for fetching and saving data using fastf1
-│ ├── preprocessing.py # Module for data cleaning and feature engineering
-│ ├── eda.py # Exploratory Data Analysis (EDA) scripts
-│ ├── modeling.py # Model training and evaluation
-│ ├── api.py # Flask API for real-time predictions
-│ └── utils.py # Utility functions (e.g., logging, helpers)
+├── src/
+│ ├── init .py
+│ ├── data_collection.py
+│ ├── preprocessing.py
+│ ├── eda.py
+│ ├── modeling.py
+│ ├── api.py
+│ └── utils.py
 │
-├── notebooks/ # Jupyter Notebooks for experimentation and EDA
-│ ├── data_exploration.ipynb # Notebook for initial data exploration
-│ ├── feature_engineering.ipynb # Notebook for feature engineering
-│ └── model_training.ipynb # Notebook for model experimentation
+├── notebooks/
+│ ├── data_exploration.ipynb
+│ ├── feature_engineering.ipynb
+│ └── model_training.ipynb
 │
-├── models/ # Trained models (saved as .pkl or .joblib)
-│ ├── random_forest_model.pkl # Example: Saved Random Forest model
+├── models/
+│ ├── random_forest_model.pkl
 │
-├── logs/ # Logs for debugging and monitoring
-│ ├── app.log # Log file for the Flask API
+├── logs/
+│ ├── app.log
 │
-├── tests/ # Unit tests for the project
-│ ├── test_data_collection.py # Tests for data collection module
-│ ├── test_preprocessing.py # Tests for preprocessing module
-│ └── test_api.py # Tests for the Flask API
+├── tests/
+│ ├── test_data_collection.py
+│ ├── test_preprocessing.py
+│ └── test_api.py #
 │
-└── .github/ # GitHub Actions workflows
-└── workflows/ # CI/CD pipelines
-└── ci-cd.yml # Example: Workflow for automated testing and deployment
+└── .github/
+└── workflows/
+└── ci-cd.yml
 
 
 ---
